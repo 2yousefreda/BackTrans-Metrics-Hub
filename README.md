@@ -90,7 +90,7 @@ The fastest way to set up the project is to run the `setup_project.bat` script. 
 1. **Start the Server**
 
    ```bash
-   uvicorn app.main:app --reload
+   venv\Scripts\uvicorn app.main:app --reload
    ```
 
 2. **Access API Documentation**
