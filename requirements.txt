@@ -1,0 +1,19 @@
+--extra-index-url https://download.pytorch.org/whl/cu121
+fastapi
+uvicorn[standard]
+pydantic[email]
+pydantic-settings
+httpx
+transformers
+torch
+sentencepiece
+python-dotenv
+google-generativeai
+python-multipart
+pandas
+openpyxl
+sentence-transformers
+bert-score
+sacrebleu
+numpy
+

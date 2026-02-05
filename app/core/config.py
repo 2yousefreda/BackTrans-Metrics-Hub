@@ -1,0 +1,29 @@
+from pydantic_settings import BaseSettings, SettingsConfigDict
+from typing import Optional
+
+class Settings(BaseSettings):
+    # API Keys for translation engines
+    GOOGLE_TRANSLATE_API_KEY: Optional[str] = None
+    GEMINI_API_KEY: Optional[str] = None
+    
+    HF_TOKEN: Optional[str] = None
+    
+    # API Model names
+    NLLB_MODEL_NAME: str = "facebook/nllb-200-distilled-600M"
+    GEMINI_MODEL_NAME: str = "gemini-2.0-flash"  # Default to stable, can be changed to gemini-3-flash-preview
+    
+    # App configuration
+    APP_NAME: str = "Machine Translation Evaluation System"
+    DEBUG: bool = False
+    ALLOWED_ORIGINS: list[str] = ["*"]
+    MAX_ROWS_PER_FILE: int = 1000
+    
+    # Concurrency configuration
+    CONCURRENT_ROWS: int = 5
+    CONCURRENT_EVAL_TASKS: int = 2
+    GEMINI_MAX_CONCURRENT: int = 2
+    GOOGLE_MAX_CONCURRENT: int = 2
+
+    model_config = SettingsConfigDict(env_file=".env", extra="ignore")
+
+settings = Settings()
