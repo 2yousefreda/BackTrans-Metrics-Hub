@@ -120,6 +120,20 @@ The system expects an Excel file (`.xlsx` or `.xls`) with at least two columns.
 | :--- | :--- |
 | مرحباً بك في نظامنا | Welcome to our system |
 
+### 🌍 Supported Languages
+
+The system automatically detects the language from the **header of Column B**. If no matching keyword is found, it defaults to **English**.
+
+| Language    | Keywords for Detection               |
+| :---------- | :----------------------------------- |
+| **English** | `english`, `en`, `eng`, `إنجليزي`    |
+| **French**  | `french`, `fr`, `français`, `فرنسي`  |
+| **Spanish** | `spanish`, `es`, `español`, `إسباني` |
+| **German**  | `german`, `de`, `deutsch`, `ألماني`  |
+
+> [!TIP]
+> To ensure correct detection, make sure your translation column header contains one of the keywords above.
+
 ### Output Format
 
 The system will return a new Excel file containing all original columns plus:
