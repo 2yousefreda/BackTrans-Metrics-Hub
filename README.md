@@ -104,7 +104,7 @@ The fastest way to set up the project is to run the `setup_project.bat` script. 
    - **Column 2**: Translated text (e.g., English, French).
    - The system will detect the language, perform back-translation to Arabic, and append similarity scores.
 
-## � Excel File Structure
+## Excel File Structure
 
 The system expects an Excel file (`.xlsx` or `.xls`) with at least two columns.
 
@@ -127,7 +127,7 @@ The system will return a new Excel file containing all original columns plus:
 - **Engine Back-Translation**: One column for each engine (Gemini, NLLB, Google).
 - **Quality Scores**: Three columns for each engine (Cosine Similarity, BERTScore, BLEU).
 
-## �📁 Project Structure
+## 📁 Project Structure
 
 ```text
 ├── app/
