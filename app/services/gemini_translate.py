@@ -33,9 +33,8 @@ class GeminiTranslateService:
         )
 
         generation_config = genai.types.GenerationConfig(
-            temperature=0.1,
-            top_p=0.95,
-            max_output_tokens=1024,
+            temperature=1,
+            top_p=0.95
         )
 
         for attempt in range(retries + 1):

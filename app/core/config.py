@@ -10,7 +10,7 @@ class Settings(BaseSettings):
     
     # API Model names
     NLLB_MODEL_NAME: str = "facebook/nllb-200-distilled-600M"
-    GEMINI_MODEL_NAME: str = "gemini-2.0-flash"  # Default to stable, can be changed to gemini-3-flash-preview
+    GEMINI_MODEL_NAME: str = "gemini-3-flash-preview"
     
     # App configuration
     APP_NAME: str = "BackTrans-Metrics-Hub"
