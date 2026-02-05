@@ -3,7 +3,7 @@ setlocal
 cd /d "%~dp0"
 
 echo ===================================================
-echo   Machine Translation Evaluation System - Setup
+echo   BackTrans-Metrics-Hub - Setup
 echo ===================================================
 
 echo This script will set up the environment and install dependencies.

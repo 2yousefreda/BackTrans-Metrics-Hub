@@ -57,7 +57,7 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(
     title=settings.APP_NAME,
-    description="Evaluate machine translation quality using back-translation.",
+    description="Professional evaluation system for machine translation quality using back-translation and linguistic metrics.",
     version="1.0.0",
     lifespan=lifespan
 )

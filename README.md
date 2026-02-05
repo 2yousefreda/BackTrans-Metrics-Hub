@@ -1,4 +1,4 @@
-# Machine Translation Evaluation System
+# BackTrans-Metrics-Hub
 
 A high-performance FastAPI-based system designed to evaluate the quality of machine translations through **Back-Translation** and advanced linguistic metrics.
 
@@ -43,8 +43,8 @@ The fastest way to set up the project is to run the `setup_project.bat` script. 
 1. **Clone the Repository**
 
    ```bash
-   git clone <repository-url>
-   cd translation-evaluation-system
+   git clone https://github.com/2yousefreda/BackTrans-Metrics-Hub.git
+   cd BackTrans-Metrics-Hub
    ```
 
 2. **Create a Virtual Environment**

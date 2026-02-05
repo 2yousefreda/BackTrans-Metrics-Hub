@@ -13,7 +13,7 @@ class Settings(BaseSettings):
     GEMINI_MODEL_NAME: str = "gemini-2.0-flash"  # Default to stable, can be changed to gemini-3-flash-preview
     
     # App configuration
-    APP_NAME: str = "Machine Translation Evaluation System"
+    APP_NAME: str = "BackTrans-Metrics-Hub"
     DEBUG: bool = False
     ALLOWED_ORIGINS: list[str] = ["*"]
     MAX_ROWS_PER_FILE: int = 1000
