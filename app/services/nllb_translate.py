@@ -20,36 +20,14 @@ class NLLBTranslateService:
         if self._model is None:
             print(f"Loading NLLB model: {settings.NLLB_MODEL_NAME}...")
             
-            try:
-                # Try loading from local cache first to avoid network timeouts
-                print(f"Attempting to load NLLB model from local cache...")
-                self._tokenizer = AutoTokenizer.from_pretrained(
-                    settings.NLLB_MODEL_NAME,
-                    token=settings.HF_TOKEN,
-                    src_lang="eng_Latn",
-                    local_files_only=True
-                )
-                self._model = AutoModelForSeq2SeqLM.from_pretrained(
-                    settings.NLLB_MODEL_NAME,
-                    token=settings.HF_TOKEN,
-                    dtype=torch.float32,
-                    local_files_only=True,
-                    use_safetensors=True
-                )
-            except Exception as e:
-                # Fallback to downloading if not found locally
-                print(f"Local model not found (error: {e}), downloading...")
-                self._tokenizer = AutoTokenizer.from_pretrained(
-                    settings.NLLB_MODEL_NAME,
-                    token=settings.HF_TOKEN,
-                    src_lang="eng_Latn"
-                )
-                self._model = AutoModelForSeq2SeqLM.from_pretrained(
-                    settings.NLLB_MODEL_NAME,
-                    token=settings.HF_TOKEN,
-                    dtype=torch.float32,
-                    use_safetensors=True
-                )
+            self._tokenizer = AutoTokenizer.from_pretrained(
+                settings.NLLB_MODEL_NAME,
+                src_lang="eng_Latn"
+            )
+            self._model = AutoModelForSeq2SeqLM.from_pretrained(
+                settings.NLLB_MODEL_NAME,
+                torch_dtype=torch.float32
+            )
             
             self.device = "cuda" if torch.cuda.is_available() else "cpu"
             self._model.to(self.device)

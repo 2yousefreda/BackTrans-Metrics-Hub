@@ -9,8 +9,10 @@ from fastapi.responses import StreamingResponse
 import pandas as pd
 import asyncio
 import time
+import torch
 from io import BytesIO
 from typing import Optional
+from tqdm import tqdm
 
 from app.services.gemini_translate import gemini_service
 from app.services.nllb_translate import nllb_service
@@ -20,6 +22,9 @@ from app.core.config import settings
 from app.utils.logger import logger
 
 router = APIRouter()
+
+# Global semaphores for resource protection
+eval_semaphore = asyncio.Semaphore(settings.CONCURRENT_EVAL_TASKS)
 
 # Language detection mapping
 LANG_MAP = {
@@ -47,14 +52,17 @@ async def back_translate_row(text: str, source_lang: str, use_gemini: bool, use_
     engine_names = []
     
     if use_gemini:
+        print(f"    - Starting Gemini translation...")
         tasks.append(gemini_service.translate(text, source_lang, 'ar'))
         engine_names.append('gemini')
     
     if use_nllb:
+        print(f"    - Starting NLLB translation...")
         tasks.append(nllb_service.translate(text, source_lang, 'ar'))
         engine_names.append('nllb')
         
     if use_google:
+        print(f"    - Starting Google translation...")
         tasks.append(google_service.translate(text, source_lang, 'ar'))
         engine_names.append('google')
         
@@ -74,24 +82,36 @@ async def back_translate_row(text: str, source_lang: str, use_gemini: bool, use_
     return results
 
 
-async def evaluate_translation_async(original: str, back_translated: str, enable_evaluation: bool) -> dict:
+async def evaluate_translation_async(original: str, back_translated: str, enable_evaluation: bool, model_key: str = "xlm-roberta-large") -> dict:
     """
     Evaluate translation quality asynchronously (using threads for CPU bound tasks)
     """
     if not enable_evaluation or not back_translated or back_translated.startswith("ERROR:"):
         return {
-            'cosine_sim': None,
-            'bert_score': None,
-            'bleu': None
+            'cosine_doc': None,
+            'cosine_sent_min': None,
+            'bert_score_doc': None,
+            'bert_score_sent_min': None,
+            'bleu': None,
+            'decision': None,
+            'reason': None
         }
     
-    # Run heavy CPU-bound evaluation in a thread pool
-    scores = await asyncio.to_thread(evaluation_service.evaluate_all, original, back_translated)
+    # Run heavy CPU-bound evaluation in a thread pool with global semaphore protection
+    async with eval_semaphore:
+        res = await asyncio.to_thread(evaluation_service.evaluate_all, original, back_translated, model_key)
+        # Clear CUDA cache after each heavy evaluation to prevent buildup
+        if torch.cuda.is_available():
+            torch.cuda.empty_cache()
     
     return {
-        'cosine_sim': round(scores['cosine_similarity'], 4),
-        'bert_score': round(scores['bert_score'], 4),
-        'bleu': round(scores['bleu_score'], 2)
+        'cosine_doc': round(res['cosine_doc'], 4),
+        'cosine_sent_min': round(res['cosine_sent']['min'], 4),
+        'bert_score_doc': round(res['bert_score_doc'], 4),
+        'bert_score_sent_min': round(res['bert_score_sent']['min'], 4),
+        'bleu': round(res['bleu'], 2),
+        'decision': res['decision']['decision'],
+        'reason': res['decision']['reason']
     }
 
 
@@ -187,9 +207,9 @@ async def back_translate_excel(
                 row_result = {
                     'idx': idx,
                     'gemini': "", 'nllb': "", 'google': "",
-                    'gemini_scores': {'cosine': None, 'bert': None, 'bleu': None},
-                    'nllb_scores': {'cosine': None, 'bert': None, 'bleu': None},
-                    'google_scores': {'cosine': None, 'bert': None, 'bleu': None}
+                    'gemini_scores': {'cosine_doc': None, 'cosine_sent_min': None, 'bert_score_doc': None, 'bert_score_sent_min': None, 'bleu': None, 'decision': None, 'reason': None},
+                    'nllb_scores': {'cosine_doc': None, 'cosine_sent_min': None, 'bert_score_doc': None, 'bert_score_sent_min': None, 'bleu': None, 'decision': None, 'reason': None},
+                    'google_scores': {'cosine_doc': None, 'cosine_sent_min': None, 'bert_score_doc': None, 'bert_score_sent_min': None, 'bleu': None, 'decision': None, 'reason': None}
                 }
                 
                 if pd.isna(text) or text.strip() == '' or text == 'nan':
@@ -212,24 +232,35 @@ async def back_translate_excel(
                         row_result[engine] = translations[engine]
                 
                 if eval_tasks:
+                    print(f"  🔍 Evaluating translations for Row {idx+1:03d}...")
                     eval_results = await asyncio.gather(*eval_tasks)
                     for engine, scores in zip(engines_to_eval, eval_results):
-                        row_result[f"{engine}_scores"] = {
-                            'cosine': scores['cosine_sim'],
-                            'bert': scores['bert_score'],
-                            'bleu': scores['bleu']
-                        }
+                        print(f"    ⭐ {engine.upper()}: {scores['decision']} (BS_Doc={scores['bert_score_doc']}, Cos_Min={scores['cosine_sent_min']})")
+                        row_result[f"{engine}_scores"] = scores
                 
                 return row_result
 
-        # Create tasks for all rows with a tiny delay to avoid burst rate limiting
+        # Create tasks for all rows
         tasks = []
         for idx, row in df.iterrows():
             tasks.append(process_row_task(idx, row))
-            await asyncio.sleep(0.05) # Jitter/Burst protection
-        
-        # Run all rows concurrently with semaphore protection
-        all_row_results = await asyncio.gather(*tasks)
+            
+        # Run all rows concurrently with semaphore protection and progress bar
+        print(f"\n🚀 Processing {len(tasks)} rows...")
+        all_row_results = []
+        with tqdm(total=len(tasks), desc="Back-Translating", unit="row", colour="green") as pbar:
+            for f in asyncio.as_completed(tasks):
+                res = await f
+                all_row_results.append(res)
+                pbar.update(1)
+                
+                # Improved row completion log
+                idx = res['idx'] + 1
+                engines_done = [eng for eng in ['gemini', 'nllb', 'google'] if res[eng] and not res[eng].startswith("ERROR:")]
+                if engines_done:
+                    print(f"  🏁 Row {idx:03d} Finalized! (Engines: {', '.join(engines_done)})")
+                else:
+                    print(f"  ❌ Row {idx:03d} Finalized with Errors/Empty results")
         
         # Sort results by index to maintain order
         all_row_results.sort(key=lambda x: x['idx'])
@@ -238,22 +269,34 @@ async def back_translate_excel(
         if use_gemini:
             df['Gemini_BackTranslation'] = [r['gemini'] for r in all_row_results]
             if enable_evaluation:
-                df['Gemini_CosineSim'] = [r['gemini_scores']['cosine'] for r in all_row_results]
-                df['Gemini_BERTScore'] = [r['gemini_scores']['bert'] for r in all_row_results]
+                df['Gemini_Decision'] = [r['gemini_scores']['decision'] for r in all_row_results]
+                df['Gemini_Reason'] = [r['gemini_scores']['reason'] for r in all_row_results]
+                df['Gemini_Cosine_Doc'] = [r['gemini_scores']['cosine_doc'] for r in all_row_results]
+                df['Gemini_Cosine_SentMin'] = [r['gemini_scores']['cosine_sent_min'] for r in all_row_results]
+                df['Gemini_BERTScore_Doc'] = [r['gemini_scores']['bert_score_doc'] for r in all_row_results]
+                df['Gemini_BERTScore_SentMin'] = [r['gemini_scores']['bert_score_sent_min'] for r in all_row_results]
                 df['Gemini_BLEU'] = [r['gemini_scores']['bleu'] for r in all_row_results]
         
         if use_nllb:
             df['NLLB_BackTranslation'] = [r['nllb'] for r in all_row_results]
             if enable_evaluation:
-                df['NLLB_CosineSim'] = [r['nllb_scores']['cosine'] for r in all_row_results]
-                df['NLLB_BERTScore'] = [r['nllb_scores']['bert'] for r in all_row_results]
+                df['NLLB_Decision'] = [r['nllb_scores']['decision'] for r in all_row_results]
+                df['NLLB_Reason'] = [r['nllb_scores']['reason'] for r in all_row_results]
+                df['NLLB_Cosine_Doc'] = [r['nllb_scores']['cosine_doc'] for r in all_row_results]
+                df['NLLB_Cosine_SentMin'] = [r['nllb_scores']['cosine_sent_min'] for r in all_row_results]
+                df['NLLB_BERTScore_Doc'] = [r['nllb_scores']['bert_score_doc'] for r in all_row_results]
+                df['NLLB_BERTScore_SentMin'] = [r['nllb_scores']['bert_score_sent_min'] for r in all_row_results]
                 df['NLLB_BLEU'] = [r['nllb_scores']['bleu'] for r in all_row_results]
         
         if use_google:
             df['Google_BackTranslation'] = [r['google'] for r in all_row_results]
             if enable_evaluation:
-                df['Google_CosineSim'] = [r['google_scores']['cosine'] for r in all_row_results]
-                df['Google_BERTScore'] = [r['google_scores']['bert'] for r in all_row_results]
+                df['Google_Decision'] = [r['google_scores']['decision'] for r in all_row_results]
+                df['Google_Reason'] = [r['google_scores']['reason'] for r in all_row_results]
+                df['Google_Cosine_Doc'] = [r['google_scores']['cosine_doc'] for r in all_row_results]
+                df['Google_Cosine_SentMin'] = [r['google_scores']['cosine_sent_min'] for r in all_row_results]
+                df['Google_BERTScore_Doc'] = [r['google_scores']['bert_score_doc'] for r in all_row_results]
+                df['Google_BERTScore_SentMin'] = [r['google_scores']['bert_score_sent_min'] for r in all_row_results]
                 df['Google_BLEU'] = [r['google_scores']['bleu'] for r in all_row_results]
         
         # End timer

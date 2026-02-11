@@ -4,7 +4,8 @@ uvicorn[standard]
 pydantic[email]
 pydantic-settings
 httpx
-transformers
+transformers<4.44.0
+huggingface-hub==0.23.2
 torch
 sentencepiece
 python-dotenv
@@ -15,5 +16,6 @@ openpyxl
 sentence-transformers
 bert-score
 sacrebleu
-numpy
-
+numpy<2.0.0
+camel-tools
+tqdm

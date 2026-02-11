@@ -18,9 +18,9 @@ class Settings(BaseSettings):
     ALLOWED_ORIGINS: list[str] = ["*"]
     MAX_ROWS_PER_FILE: int = 1000
     
-    # Concurrency configuration
-    CONCURRENT_ROWS: int = 5
-    CONCURRENT_EVAL_TASKS: int = 2
+    # Concurrency configuration (Safely lowered to prevent OOM)
+    CONCURRENT_ROWS: int = 3
+    CONCURRENT_EVAL_TASKS: int = 1
     GEMINI_MAX_CONCURRENT: int = 2
     GOOGLE_MAX_CONCURRENT: int = 2
 
